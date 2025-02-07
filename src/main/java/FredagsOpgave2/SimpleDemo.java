@@ -10,70 +10,70 @@ import java.util.Map;
 import java.util.TimeZone;
 
 public class SimpleDemo {
-    private ServerSocket server;
+    private ServerSocket server;  // ServerSocket objekt til at lytte på indkommende forbindelser
 
-    // HashMap til rutehåndtering
+    // HashMap til rutehåndtering (til at matche HTTP-anmodninger med svar)
     private Map<String, String> routes;
 
     public SimpleDemo() {
         // Initialiser HashMap med ruter og deres svar
         routes = new HashMap<>();
-        routes.put("/hello", "Hello, World!");
-        routes.put("/time", new Date().toString());
-        routes.put("/echo", "Ingen gemte beskeder.");
+        routes.put("/hello", "Hello, World!");  // /hello rute svarer med "Hello, World!"
+        routes.put("/time", new Date().toString());  // /time rute svarer med den nuværende dato og tid
+        routes.put("/echo", "Ingen gemte beskeder.");  // /echo rute svarer med en standardbesked
     }
 
     public void start() {
         try {
-            server = new ServerSocket(8080);  // Lyt på port 8080
+            server = new ServerSocket(8080);  // Opret en server, der lytter på port 8080
             System.out.println("Server lytter på port 8080...");
 
             // Lyt på forbindelser og håndter dem i nye tråde
             while (true) {
-                Socket socket = server.accept();  // Vent på forbindelse
-                new Thread(() -> handleClient(socket)).start();
+                Socket socket = server.accept();  // Vent på en ny klientforbindelse
+                new Thread(() -> handleClient(socket)).start();  // Håndter klienten i en ny tråd
             }
         } catch (IOException ex) {
-            ex.printStackTrace();
+            ex.printStackTrace();  // Udskriv fejl, hvis serveren ikke kan starte
         }
     }
 
     private void handleClient(Socket socket) {
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-             PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));  // Læs indkommende data fra klienten
+             PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {  // Send data tilbage til klienten
 
-            String requestLine = in.readLine();
+            String requestLine = in.readLine();  // Læs første linje af HTTP-anmodningen
             if (requestLine != null) {
-                System.out.println("Besked fra klient: " + requestLine);
-                String[] parts = requestLine.split(" ");
-                String method = parts[0];
-                String path = parts[1];
+                System.out.println("Besked fra klient: " + requestLine);  // Udskriv anmodningen fra klienten
+                String[] parts = requestLine.split(" ");  // Del anmodningen i dele (metode og sti)
+                String method = parts[0];  // HTTP-metoden (f.eks. GET, POST)
+                String path = parts[1];  // Stien (f.eks. /hello)
 
                 // Håndtering af GET-anmodninger
                 if (method.equals("GET")) {
-                    handleGET(path, out);
+                    handleGET(path, out);  // Håndter GET-anmodningen
                 }
                 // Håndtering af POST-anmodninger
                 else if (method.equals("POST")) {
-                    handlePOST(in, out);
+                    handlePOST(in, out);  // Håndter POST-anmodningen
                 }
                 else {
-                    sendResponse(out, "404 Not Found", "Siden blev ikke fundet.");
+                    sendResponse(out, "404 Not Found", "Siden blev ikke fundet.");  // Ugyldig metode, svar med 404
                 }
             }
-            socket.close();
+            socket.close();  // Luk forbindelsen til klienten
         } catch (IOException ex) {
-            ex.printStackTrace();
+            ex.printStackTrace();  // Udskriv fejl, hvis der er problemer med klienthåndtering
         }
     }
 
     private void handleGET(String path, PrintWriter out) {
-        String responseBody = routes.get(path);
+        String responseBody = routes.get(path);  // Hent svar fra routes HashMap baseret på stien
 
         if (responseBody != null) {
-            sendResponse(out, "200 OK", responseBody);
+            sendResponse(out, "200 OK", responseBody);  // Svar med OK og den passende besked
         } else {
-            sendResponse(out, "404 Not Found", "Siden blev ikke fundet.");
+            sendResponse(out, "404 Not Found", "Siden blev ikke fundet.");  // Hvis stien ikke findes, svar med 404
         }
     }
 
@@ -83,25 +83,26 @@ public class SimpleDemo {
 
         // Læs alle POST-data (måske flere linjer)
         while ((line = in.readLine()) != null && !line.isEmpty()) {
-            message.append(line).append("\n");
+            message.append(line).append("\n");  // Gem POST-data
         }
 
         // Hvis beskeden er tom, send fejl
         if (message.length() == 0) {
-            sendResponse(out, "400 Bad Request", "No data received in POST request.");
+            sendResponse(out, "400 Bad Request", "No data received in POST request.");  // Hvis der ikke er data, svar med 400
             return;
         }
 
         // Her gemmes beskeden, og den returneres som en response.
         String storedMessage = message.toString().trim();
-        sendResponse(out, "200 OK", "Message stored: " + storedMessage);
+        sendResponse(out, "200 OK", "Message stored: " + storedMessage);  // Returner den modtagne besked
     }
 
     private void sendResponse(PrintWriter out, String status, String message) {
-        SimpleDateFormat sdf = new SimpleDateFormat("E, dd MMM yyyy HH:mm:ss z");
-        sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
-        String formattedDate = sdf.format(new Date());
+        SimpleDateFormat sdf = new SimpleDateFormat("E, dd MMM yyyy HH:mm:ss z");  // Formatér datoen for HTTP-responsen
+        sdf.setTimeZone(TimeZone.getTimeZone("GMT"));  // Indstil tid til GMT
+        String formattedDate = sdf.format(new Date());  // Få den aktuelle dato i korrekt format
 
+        // Byg HTTP-responsen
         String response = "HTTP/1.1 " + status + "\r\n" +
                 "Date: " + formattedDate + "\r\n" +
                 "Server: SimpleDemo\r\n" +
@@ -109,10 +110,9 @@ public class SimpleDemo {
                 "Content-Length: " + message.length() + "\r\n" +
                 "\r\n" + message;
 
-        out.print(response);
-        out.flush();  // Sørg for, at svaret bliver sendt til klienten.
+        out.print(response);  // Send responsen til klienten
+        out.flush();  // Sørg for, at svaret bliver sendt til klienten
     }
-
 
     public static void main(String[] args) {
         new SimpleDemo().start();  // Start serveren
