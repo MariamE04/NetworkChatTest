@@ -1,4 +1,4 @@
-package FredagsOpgave1;
+package CodeLab2;
 
 import java.io.BufferedReader;
 import java.io.IOException;
