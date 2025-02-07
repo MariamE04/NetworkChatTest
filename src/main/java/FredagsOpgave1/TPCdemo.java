@@ -1,4 +1,4 @@
-package FredagsOpgave2;
+package FredagsOpgave1;
 
 import java.io.BufferedReader;
 import java.io.IOException;
