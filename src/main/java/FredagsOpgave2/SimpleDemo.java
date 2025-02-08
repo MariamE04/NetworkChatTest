@@ -1,3 +1,5 @@
+//SimpleDemo (Server): En simpel webserver, der håndterer HTTP GET- og POST-anmodninger.
+//Denne klasse fungerer som en simpel HTTP-server, der lytter på port 8080 og håndterer HTTP-anmodninger.
 package FredagsOpgave2;
 
 import java.io.*;
@@ -16,8 +18,7 @@ public class SimpleDemo {
     private Map<String, String> routes;
 
     public SimpleDemo() {
-        // Initialiser HashMap med ruter og deres svar
-        routes = new HashMap<>();
+        routes = new HashMap<>(); //Initialiser HashMap med ruter og deres svar
         routes.put("/hello", "Hello, World!");  // /hello rute svarer med "Hello, World!"
         routes.put("/time", new Date().toString());  // /time rute svarer med den nuværende dato og tid
         routes.put("/echo", "Ingen gemte beskeder.");  // /echo rute svarer med en standardbesked
@@ -30,8 +31,8 @@ public class SimpleDemo {
 
             // Lyt på forbindelser og håndter dem i nye tråde
             while (true) {
-                Socket socket = server.accept();  // Vent på en ny klientforbindelse
-                new Thread(() -> handleClient(socket)).start();  // Håndter klienten i en ny tråd
+                Socket socket = server.accept();  //Serveren lytter konstant på nye forbindelser (server.accept()).
+                new Thread(() -> handleClient(socket)).start();  //For hver ny forbindelse opretter den en ny tråd, der håndterer klienten.
             }
         } catch (IOException ex) {
             ex.printStackTrace();  // Udskriv fejl, hvis serveren ikke kan starte
@@ -66,7 +67,7 @@ public class SimpleDemo {
             ex.printStackTrace();  // Udskriv fejl, hvis der er problemer med klienthåndtering
         }
     }
-
+    //Behandler GET-anmodninger
     private void handleGET(String path, PrintWriter out) {
         String responseBody = routes.get(path);  // Hent svar fra routes HashMap baseret på stien
 
@@ -76,7 +77,7 @@ public class SimpleDemo {
             sendResponse(out, "404 Not Found", "Siden blev ikke fundet.");  // Hvis stien ikke findes, svar med 404
         }
     }
-
+    //Behandler POST-anmodninger
     private void handlePOST(BufferedReader in, PrintWriter out) throws IOException {
         StringBuilder message = new StringBuilder();
         String line;
@@ -118,5 +119,4 @@ public class SimpleDemo {
         new SimpleDemo().start();  // Start serveren
     }
 }
-
 

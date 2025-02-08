@@ -1,3 +1,9 @@
+//SimpleClient (Klient): En klient, der kan forbinde til serveren og sende anmodninger.
+//Denne klasse fungerer som en klient, der:
+//Opretter en socket-forbindelse til serveren.
+//Sender GET eller POST-anmodninger.
+//Læser og viser serverens svar.
+
 package FredagsOpgave2;
 
 import java.io.*;
@@ -9,9 +15,9 @@ public class SimpleClient {
     private PrintWriter out;  // PrintWriter til at sende data til serveren
     private BufferedReader in;  // BufferedReader til at læse serverens svar
 
-    public void startConnection(String ip, int port) {
+    public void startConnection(String ip, int port) { //Starter en forbindelse til serveren
         try {
-            clientSocket = new Socket(ip, port);  // Opret en forbindelse til serveren på den givne IP og port
+            clientSocket = new Socket(ip, port);  // Opret en forbindelse til serveren på den givet IP og port
             out = new PrintWriter(clientSocket.getOutputStream(), true);  // Initialiser PrintWriter til at sende data
             in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));  // Initialiser BufferedReader til at læse data
             System.out.println("Forbundet til serveren.");  // Udskriv en besked, når forbindelsen er etableret
@@ -19,7 +25,7 @@ public class SimpleClient {
             throw new RuntimeException("Kunne ikke forbinde til serveren", e);  // Håndter fejl ved forbindelse
         }
     }
-
+    // Interaktiv session med serveren
     public void startInteractiveSession() {
         Scanner scanner = new Scanner(System.in);  // Scanner til at læse input fra brugeren
 
@@ -52,7 +58,7 @@ public class SimpleClient {
         stopConnection();  // Luk forbindelsen
         scanner.close();  // Luk scanner
     }
-
+    //Lukker BufferedReader, PrintWriter og Socket
     public void stopConnection() {
         try {
             in.close();  // Luk BufferedReader
@@ -70,3 +76,4 @@ public class SimpleClient {
         client.startInteractiveSession();  // Start interaktiv session med serveren
     }
 }
+
