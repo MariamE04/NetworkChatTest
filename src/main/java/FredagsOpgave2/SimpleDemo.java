@@ -14,14 +14,16 @@ import java.util.TimeZone;
 public class SimpleDemo {
     private ServerSocket server;  // ServerSocket objekt til at lytte på indkommende forbindelser
 
+
     // HashMap til rutehåndtering (til at matche HTTP-anmodninger med svar)
     private Map<String, String> routes;
+    private String sortedMessage = "Default message"; ;
 
     public SimpleDemo() {
         routes = new HashMap<>(); //Initialiser HashMap med ruter og deres svar
         routes.put("/hello", "Hello, World!");  // /hello rute svarer med "Hello, World!"
-        routes.put("/time", new Date().toString());  // /time rute svarer med den nuværende dato og tid
-        routes.put("/echo", "Ingen gemte beskeder.");  // /echo rute svarer med en standardbesked
+        routes.put("/time", new Date().toString());// /time rute svarer med den nuværende dato og tid
+        routes.put("/echo", sortedMessage);  // /echo rute svarer med en standardbesked
     }
 
     public void start() {
@@ -92,6 +94,11 @@ public class SimpleDemo {
             sendResponse(out, "400 Bad Request", "No data received in POST request.");  // Hvis der ikke er data, svar med 400
             return;
         }
+
+        // Gem og opdater den globale besked
+        sortedMessage = message.toString().trim();
+        routes.put("/echo", sortedMessage); // Nu bliver /echo opdateret
+
 
         // Her gemmes beskeden, og den returneres som en response.
         String storedMessage = message.toString().trim();
