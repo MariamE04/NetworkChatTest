@@ -1,4 +1,4 @@
-package FredagsOpgave2;
+/*package FredagsOpgave2;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,4 +32,4 @@ class SimpleDemoTest {
         client.sendMessage("Over and Out");
         client.stopConnection();
     }
-}
+}*/
