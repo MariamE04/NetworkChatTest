@@ -1,4 +1,4 @@
-package SimpleTCPJava;
+package SimpleTCPJavaYT;
 
 import java.io.*;
 import java.net.ServerSocket;

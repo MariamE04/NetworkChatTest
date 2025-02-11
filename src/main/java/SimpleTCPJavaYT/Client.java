@@ -1,6 +1,5 @@
-package SimpleTCPJava;
+package SimpleTCPJavaYT;
 
-import javax.imageio.IIOException;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -76,6 +75,5 @@ public class Client implements Runnable{
     }
 
 }
-
 
 
