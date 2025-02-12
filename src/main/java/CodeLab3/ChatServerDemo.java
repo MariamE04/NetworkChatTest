@@ -1,4 +1,4 @@
-package ChatServerDemo;
+package CodeLab3;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -11,6 +11,10 @@ import java.util.List;
 
 // Klassen ChatServerDemo implementerer IObservable, hvilket betyder, at den kan sende beskeder til klienter.
 public class ChatServerDemo implements IObservable {
+    private static volatile IObservable server = getInstance(); // Volatil variabel sikrer, at ændringer er synlige på tværs af tråde.
+    private List<ClientHandler> clients = new ArrayList<>(); // Liste til at gemme klienter, der er forbundet til serveren.
+    private ServerSocket serverSocket;
+
 
     // Privat konstruktor forhindrer direkte instansiering af klassen udefra.
     private ChatServerDemo() {}
@@ -23,21 +27,17 @@ public class ChatServerDemo implements IObservable {
         return server;
     }
 
-    private static volatile IObservable server = getInstance(); // Volatil variabel sikrer, at ændringer er synlige på tværs af tråde.
-
-    private List<ClientHandler> clients = new ArrayList<>(); // Liste til at gemme klienter, der er forbundet til serveren.
-
     public static void main(String[] args) {
         new ChatServerDemo().startServer(8080); // Starter serveren på port 8080.
     }
 
     public void startServer(int port) {
         try {
-            ServerSocket serverSocket = new ServerSocket(port); // Opretter en server-socket, der lytter på den angivne port.
+            this.serverSocket = new ServerSocket(port); // Opretter en server-socket, der lytter på den angivne port.
 
             while (true) { // Uendelig løkke til at acceptere nye klientforbindelser.
                 Socket clientSocket = serverSocket.accept(); // Venter på en klientforbindelse.
-                ClientHandler clientHandler = new ClientHandler(clientSocket, this); // Opretter en ny ClientHandler til klienten.
+                ClientHandler clientHandler = new ClientHandler(clientSocket, this, clients); // Opretter en ny ClientHandler til klienten.
                 clients.add(clientHandler); // Tilføjer klienten til listen over aktive klienter.
                 new Thread(clientHandler).start(); // Starter klienthåndteringen i en ny tråd.
             }
@@ -62,17 +62,45 @@ public class ChatServerDemo implements IObservable {
         return null; // Returnerer null, hvis ingen klient med det navn findes.
     }
 
+    public void shutdown() {
+        try {
+            broadcast("Server is shutting down. All clients will be disconnected.");
+
+            for (ClientHandler client : clients) {
+                try {
+                    client.out.close();
+                    client.in.close();
+                    client.clientSocket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            clients.clear();
+
+            if (serverSocket != null && !serverSocket.isClosed()) {
+                serverSocket.close();
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    //----------------------------------------------------------------------------------------------------------------------------------------------
+
     // Indre klasse, der håndterer en klientforbindelse. Implementerer både Runnable (for tråde) og IObserver (for beskeder).
     private static class ClientHandler implements Runnable, IObserver {
         private Socket clientSocket; // Klientens socket-forbindelse.
         private PrintWriter out; // Skriver data til klienten.
         private BufferedReader in; // Læser data fra klienten.
         private IObservable server; // Reference til serveren.
+        private List<ClientHandler> clients; // Liste over klienter.
         private String name = null; // Klientens navn.
 
-        public ClientHandler(Socket socket, IObservable server) throws IOException {
+        public ClientHandler(Socket socket, IObservable server, List<ClientHandler> clients) throws IOException {
             this.clientSocket = socket;
             this.server = server;
+            this.clients = clients; // Initialiserer klientlisten.
             out = new PrintWriter(clientSocket.getOutputStream(), true); // Opretter en PrintWriter til at sende data.
             in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream())); // Opretter en BufferedReader til at læse data.
         }
@@ -81,11 +109,16 @@ public class ChatServerDemo implements IObservable {
             return name; // Returnerer klientens navn.
         }
 
+        // Metode til at returnere listen over tilgængelige kommandoer
+        private String getHelpMessage() {
+            return "List of available commands: #JOIN, #MESSAGE, #PRIVATE, #GETLIST, #PRIVATESUBLIST, #HELP, #STOPSERVER";
+        }
+
         @Override
         public void run() {
             try {
                 String msg;
-                while ((msg = in.readLine()) != null) { // Læser beskeder fra klienten.
+                while ((msg = in.readLine()) != null) {// Læser beskeder fra klienten.
                     if (msg.startsWith("#JOIN")) {
                         // Håndterer, når en ny klient slutter sig til chatten.
                         this.name = msg.split(" ")[1]; // Henter klientens navn.
@@ -113,7 +146,30 @@ public class ChatServerDemo implements IObservable {
                         } else {
                             out.println("Invalid private message format. Use: #PRIVATE <nickname> <message>");
                         }
-
+                    } else if (msg.startsWith("#GETLIST")) {
+                        for (ClientHandler c : clients) {
+                            out.println(c.getName());
+                        }
+                    } else if (msg.startsWith("#PRIVATESUBLIST")) {
+                        String[] parts = msg.split(" ", 3);
+                        if (parts.length == 3) {
+                            String[] recipients = parts[1].split(",");
+                            String sublistMessageContent = parts[2];
+                            for (String recipientName : recipients) {
+                                ClientHandler recipient = ((ChatServerDemo) server).getClientByName(recipientName.trim()); // Finder modtageren.
+                                if (recipient != null) {
+                                    recipient.notify(name + " (private): " + sublistMessageContent); // Sender beskeden til modtageren.
+                                } else {
+                                    out.println("User " + recipientName + " not found."); // Hvis en af modtagerne ikke findes.
+                                }
+                            }
+                        } else {
+                            out.println("Invalid private sublist message format. Use: #PRIVATESUBLIST <nickname1,nickname2,...> <message>");
+                        }
+                    } else if (msg.startsWith("#HELP")) {
+                        out.println(getHelpMessage());// Kalder metoden getHelpMessage for at få listen over kommandoer
+                    } else if (msg.startsWith("#STOPSERVER")) {
+                        ((ChatServerDemo) server).shutdown();
                     } else {
                         // Håndterer almindelige beskeder.
                         server.broadcast(name + ": " + msg);
@@ -128,7 +184,7 @@ public class ChatServerDemo implements IObservable {
         public void notify(String msg) {
             System.out.println(msg); // Udskriver beskeden i serverens terminal.
             out.println(msg); // Sender beskeden til klienten.
+         }
         }
-    }
-}
 
+    }
