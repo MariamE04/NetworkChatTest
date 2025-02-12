@@ -68,15 +68,13 @@ public class ChatServerDemo implements IObservable {
 
             for (ClientHandler client : clients) {
                 try {
+                    client.clientSocket.close();
                     client.out.close();
                     client.in.close();
-                    client.clientSocket.close();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
-
-            clients.clear();
 
             if (serverSocket != null && !serverSocket.isClosed()) {
                 serverSocket.close();
@@ -95,7 +93,8 @@ public class ChatServerDemo implements IObservable {
         private BufferedReader in; // Læser data fra klienten.
         private IObservable server; // Reference til serveren.
         private List<ClientHandler> clients; // Liste over klienter.
-        private String name = null; // Klientens navn.
+        private String name = "GUEST"; // Klientens navn.
+        private ArrayList<String> badWords = new ArrayList<>();
 
         public ClientHandler(Socket socket, IObservable server, List<ClientHandler> clients) throws IOException {
             this.clientSocket = socket;
@@ -103,6 +102,11 @@ public class ChatServerDemo implements IObservable {
             this.clients = clients; // Initialiserer klientlisten.
             out = new PrintWriter(clientSocket.getOutputStream(), true); // Opretter en PrintWriter til at sende data.
             in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream())); // Opretter en BufferedReader til at læse data.
+
+            badWords.add("fuck");
+            badWords.add("bitch");
+            badWords.add("shit");
+            badWords.add("whore");
         }
 
         public String getName() {
@@ -119,6 +123,7 @@ public class ChatServerDemo implements IObservable {
             try {
                 String msg;
                 while ((msg = in.readLine()) != null) {// Læser beskeder fra klienten.
+                    filterMessage(msg);
                     if (msg.startsWith("#JOIN")) {
                         // Håndterer, når en ny klient slutter sig til chatten.
                         this.name = msg.split(" ")[1]; // Henter klientens navn.
@@ -170,6 +175,9 @@ public class ChatServerDemo implements IObservable {
                         out.println(getHelpMessage());// Kalder metoden getHelpMessage for at få listen over kommandoer
                     } else if (msg.startsWith("#STOPSERVER")) {
                         ((ChatServerDemo) server).shutdown();
+                    } else if (msg.startsWith("**")) {
+                        String wordToAdd = msg.substring(2).trim();  // Fjerner '**' og henter ordet
+                        addBadWord(wordToAdd); // Tilføjer ordet til badwords listen
                     } else {
                         // Håndterer almindelige beskeder.
                         server.broadcast(name + ": " + msg);
@@ -180,11 +188,29 @@ public class ChatServerDemo implements IObservable {
             }
         }
 
+        public void addBadWord(String word) {
+            // Tjekker om ordet allerede findes i listen
+            if (!badWords.contains(word)) {
+                badWords.add(word);  // Tilføjer ordet til listen
+                System.out.println("Ordet '" + word + "' er blevet tilføjet til listen over upassende ord.");
+            } else {
+                System.out.println("Ordet '" + word + "' findes allerede i listen.");
+            }
+        }
+
+        private String filterMessage(String message) {
+            for (String badWords: badWords){
+                String stars = "*".repeat(badWords.length());
+                message = message.replaceAll("(?i)\b" + badWords + "\b", stars);
+            }
+            return message;
+        }
+
+
         @Override
         public void notify(String msg) {
             System.out.println(msg); // Udskriver beskeden i serverens terminal.
             out.println(msg); // Sender beskeden til klienten.
-         }
+            }
         }
-
     }
