@@ -17,7 +17,8 @@ public class ChatServerDemo implements IObservable {
 
 
     // Privat konstruktor forhindrer direkte instansiering af klassen udefra.
-    private ChatServerDemo() {}
+    private ChatServerDemo() {
+    }
 
     // Singleton-mønster: Sikrer, at der kun er én instans af serveren.
     public static synchronized IObservable getInstance() {
@@ -62,6 +63,12 @@ public class ChatServerDemo implements IObservable {
         return null; // Returnerer null, hvis ingen klient med det navn findes.
     }
 
+    // I ChatServerDemo klassen
+    public synchronized List<ClientHandler> getClients() {
+        return clients; // Giver adgang til listen over klienter
+    }
+
+
     public void shutdown() {
         try {
             broadcast("Server is shutting down. All clients will be disconnected.");
@@ -86,136 +93,99 @@ public class ChatServerDemo implements IObservable {
     }
     //----------------------------------------------------------------------------------------------------------------------------------------------
 
-    // Indre klasse, der håndterer en klientforbindelse. Implementerer både Runnable (for tråde) og IObserver (for beskeder).
-    private static class ClientHandler implements Runnable, IObserver {
-        private Socket clientSocket; // Klientens socket-forbindelse.
-        private PrintWriter out; // Skriver data til klienten.
-        private BufferedReader in; // Læser data fra klienten.
-        private IObservable server; // Reference til serveren.
-        private List<ClientHandler> clients; // Liste over klienter.
-        private String name = "GUEST"; // Klientens navn.
-        private ArrayList<String> badWords = new ArrayList<>();
+    public class ClientHandler implements Runnable, IObserver {
+        private Socket clientSocket;
+        private PrintWriter out;
+        private BufferedReader in;
+        private IObservable server;
+        private List<ClientHandler> clients;
+        private String name = "GUEST";
+        private Command currentCommand;  // Skift fra CommandStrategy til Command
 
         public ClientHandler(Socket socket, IObservable server, List<ClientHandler> clients) throws IOException {
             this.clientSocket = socket;
             this.server = server;
-            this.clients = clients; // Initialiserer klientlisten.
-            out = new PrintWriter(clientSocket.getOutputStream(), true); // Opretter en PrintWriter til at sende data.
-            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream())); // Opretter en BufferedReader til at læse data.
-
-            badWords.add("fuck");
-            badWords.add("bitch");
-            badWords.add("shit");
-            badWords.add("whore");
-        }
-
-        public String getName() {
-            return name; // Returnerer klientens navn.
-        }
-
-        // Metode til at returnere listen over tilgængelige kommandoer
-        private String getHelpMessage() {
-            return "List of available commands: #JOIN, #MESSAGE, #PRIVATE, #GETLIST, #PRIVATESUBLIST, #HELP, #STOPSERVER";
+            this.clients = clients;
+            out = new PrintWriter(clientSocket.getOutputStream(), true);
+            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
         }
 
         @Override
         public void run() {
             try {
                 String msg;
-                while ((msg = in.readLine()) != null) {// Læser beskeder fra klienten.
+                while ((msg = in.readLine()) != null) {
+                    if (msg.isEmpty()) continue; // Undgå at behandle tomme beskeder
+
                     if (containsBadWord(msg)) {
-                        out.println("Din besked indeholder upassende ord og blev ikke sendt.");
-                        continue; // Stopper behandlingen af beskeden, så den ikke sendes til de andre.
+                        out.println("Your message contains inappropriate words and was not sent.");
+                        continue;
                     }
+
+                    // Vælg den rette kommando
                     if (msg.startsWith("#JOIN")) {
-                        // Håndterer, når en ny klient slutter sig til chatten.
-                        this.name = msg.split(" ")[1]; // Henter klientens navn.
-                        server.broadcast("A new person joined the chat. Welcome to " + name);
+                        currentCommand = new JoinCommand();
                     } else if (msg.startsWith("#MESSAGE")) {
-                        // Håndterer en offentlig besked.
-                        String messageContent = msg.substring(9).trim(); // Fjerner kommandoen og henter selve beskeden.
-                        server.broadcast(name + ": " + messageContent);
-                    } else if (msg.startsWith("#LEAVE")) {
-                        // Håndterer, når en klient forlader chatten.
-                        server.broadcast(name + " left the chat.");
-                        out.close(); // Lukker forbindelsen til klienten.
+                        currentCommand = new MessageCommand();
                     } else if (msg.startsWith("#PRIVATE")) {
-                        // Håndterer privatbeskeder.
-                        String[] parts = msg.split(" ", 3); // Opdeler beskeden i dele: kommando, modtager og selve beskeden.
-                        if (parts.length == 3) {
-                            String recipientName = parts[1]; // Modtagerens navn.
-                            String privateMessageContent = parts[2]; // Beskedens indhold.
-                            ClientHandler recipient = ((ChatServerDemo) server).getClientByName(recipientName); // Finder modtageren.
-                            if (recipient != null) {
-                                recipient.notify(name + " (private): " + privateMessageContent); // Sender beskeden til modtageren.
-                            } else {
-                                out.println("User " + recipientName + " not found."); // Hvis modtageren ikke findes.
-                            }
-                        } else {
-                            out.println("Invalid private message format. Use: #PRIVATE <nickname> <message>");
-                        }
+                        currentCommand = new PrivateMessageCommand();
                     } else if (msg.startsWith("#GETLIST")) {
-                        for (ClientHandler c : clients) {
-                            out.println(c.getName());
-                        }
-                    } else if (msg.startsWith("#PRIVATESUBLIST")) {
-                        String[] parts = msg.split(" ", 3);
-                        if (parts.length == 3) {
-                            String[] recipients = parts[1].split(",");
-                            String sublistMessageContent = parts[2];
-                            for (String recipientName : recipients) {
-                                ClientHandler recipient = ((ChatServerDemo) server).getClientByName(recipientName.trim()); // Finder modtageren.
-                                if (recipient != null) {
-                                    recipient.notify(name + " (private): " + sublistMessageContent); // Sender beskeden til modtageren.
-                                } else {
-                                    out.println("User " + recipientName + " not found."); // Hvis en af modtagerne ikke findes.
-                                }
-                            }
-                        } else {
-                            out.println("Invalid private sublist message format. Use: #PRIVATESUBLIST <nickname1,nickname2,...> <message>");
-                        }
+                        currentCommand = new GetListCommand();
                     } else if (msg.startsWith("#HELP")) {
-                        out.println(getHelpMessage());// Kalder metoden getHelpMessage for at få listen over kommandoer
+                        currentCommand = new HelpCommand();
                     } else if (msg.startsWith("#STOPSERVER")) {
-                        ((ChatServerDemo) server).shutdown();
-                    } else if (msg.startsWith("**")) {
-                        String wordToAdd = msg.substring(2).trim();  // Fjerner '**' og henter ordet
-                        addBadWord(wordToAdd); // Tilføjer ordet til badwords listen
+                        currentCommand = new StopServerCommand();
                     } else {
-                        // Håndterer almindelige beskeder.
-                        server.broadcast(name + ": " + msg);
+                        out.println("Invalid command. Type #HELP for a list of commands.");
+                        continue;
+                    }
+
+                    // Kør den valgte kommando
+                    if (currentCommand != null) {
+                        currentCommand.execute(this, msg);
                     }
                 }
             } catch (IOException e) {
-                e.printStackTrace(); // Udskriver fejl, hvis der opstår problemer.
-            }
-        }
-
-        public void addBadWord(String word) {
-            // Tjekker om ordet allerede findes i listen
-            if (!badWords.contains(word)) {
-                badWords.add(word);  // Tilføjer ordet til listen
-                System.out.println("Ordet '" + word + "' er blevet tilføjet til listen over upassende ord.");
-            } else {
-                System.out.println("Ordet '" + word + "' findes allerede i listen.");
+                System.out.println("Client disconnected: " + getName());
+                try {
+                    clientSocket.close();
+                    out.close();
+                    in.close();
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
             }
         }
 
         private boolean containsBadWord(String message) {
-            for (String badWord : badWords) {
-                if (message.toLowerCase().contains(badWord)) {
-                    return true;
-                }
-            }
-            return false;
+            // Logik for at checke for upassende ord
+            return false; // Placeholder
         }
-
-
 
         @Override
         public void notify(String msg) {
-            System.out.println(msg); // Udskriver beskeden i serverens terminal.
-            out.println(msg); // Sender beskeden til klienten.
-            }
+            out.println(msg);
+        }
+
+        public void sendMessage(String message) {
+            out.println(message);
+        }
+
+        public IObservable getServer() {
+            return server;
+        }
+
+        public PrintWriter getOut() {
+            return out;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getName() {
+            return name;
         }
     }
+}
+
