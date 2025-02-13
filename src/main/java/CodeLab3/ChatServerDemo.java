@@ -123,7 +123,10 @@ public class ChatServerDemo implements IObservable {
             try {
                 String msg;
                 while ((msg = in.readLine()) != null) {// Læser beskeder fra klienten.
-                    filterMessage(msg);
+                    if (containsBadWord(msg)) {
+                        out.println("Din besked indeholder upassende ord og blev ikke sendt.");
+                        continue; // Stopper behandlingen af beskeden, så den ikke sendes til de andre.
+                    }
                     if (msg.startsWith("#JOIN")) {
                         // Håndterer, når en ny klient slutter sig til chatten.
                         this.name = msg.split(" ")[1]; // Henter klientens navn.
@@ -198,13 +201,15 @@ public class ChatServerDemo implements IObservable {
             }
         }
 
-        private String filterMessage(String message) {
-            for (String badWords: badWords){
-                String stars = "*".repeat(badWords.length());
-                message = message.replaceAll("(?i)\b" + badWords + "\b", stars);
+        private boolean containsBadWord(String message) {
+            for (String badWord : badWords) {
+                if (message.toLowerCase().contains(badWord)) {
+                    return true;
+                }
             }
-            return message;
+            return false;
         }
+
 
 
         @Override
