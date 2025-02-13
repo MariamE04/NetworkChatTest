@@ -211,7 +211,6 @@ public class ChatServerDemo implements IObservable {
         }
 
 
-
         @Override
         public void notify(String msg) {
             System.out.println(msg); // Udskriver beskeden i serverens terminal.
