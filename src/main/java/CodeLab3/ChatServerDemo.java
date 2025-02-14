@@ -116,7 +116,7 @@ public class ChatServerDemo implements IObservable {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-            }
+            }   
 
             if (serverSocket != null && !serverSocket.isClosed()) {
                 serverSocket.close();

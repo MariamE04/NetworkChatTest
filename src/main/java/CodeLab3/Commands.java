@@ -131,4 +131,59 @@ public class Commands {
         }
     }
 
+
+    public static class ColorMessageCommand implements Command {
+        @Override
+        public void execute(ChatServerDemo.ClientHandler client, String message) {
+            if (message.length() < 15) {
+                client.sendMessage("Invalid message format. Use: #COLORMESSAGE <color> <message>");
+                return;
+            }
+            String[] parts = message.split(" ", 3);
+            if (parts.length < 3) {
+                client.sendMessage("Usage: #COLORMESSAGE <color> <message>");
+                return;
+            }
+
+            String color = parts[1];  // Farven
+            String msgContent = parts[2];  // Selve beskeden
+
+            // Brug switch til at vælge farven
+            String colorCode;
+            switch (color.toUpperCase()) {
+                case "RED":
+                    colorCode = "\u001B[31m";  // Rød farve
+                    break;
+                case "GREEN":
+                    colorCode = "\u001B[32m";  // Grøn farve
+                    break;
+                case "BLUE":
+                    colorCode = "\u001B[34m";  // Blå farve
+                    break;
+                case "YELLOW":
+                    colorCode = "\u001B[33m";  // Gul farve
+                    break;
+                case "CYAN":
+                    colorCode = "\u001B[36m";  // Cyan farve
+                    break;
+                case "MAGENTA":
+                    colorCode = "\u001B[35m";  // Magenta farve
+                    break;
+                default:
+                    colorCode = "\u001B[37m";  // Standard (hvid farve) hvis ukendt farve
+                    client.sendMessage("Unknown color. Defaulting to white.");
+                    break;
+            }
+
+            // Dekorér beskeden med den ønskede farve
+            ITextDecorator colorDecorator = new ColorDecorator(colorCode);
+            String coloredMessage = colorDecorator.decorate(msgContent);
+
+            // Send den farvede besked til alle brugere
+            client.getServer().broadcast(client.getName() + ": " + coloredMessage);
+        }
+    }
+
+
+
 }

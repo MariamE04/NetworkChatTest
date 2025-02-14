@@ -15,6 +15,7 @@ public class CommandFactory {
         commands.put("#HELP", new Commands.HelpCommand());
         commands.put("#LEAVE", new Commands.LeaveCommand());
         commands.put("#STOPSERVER", new Commands.StopServerCommand());
+        commands.put("#COLORMESSAGE", new Commands.ColorMessageCommand());
     }
 
     public static Command getCommand(String commandKey) {
