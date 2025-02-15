@@ -7,6 +7,7 @@ import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -16,6 +17,8 @@ public class ChatServerDemo implements IObservable {
     private List<ClientHandler> clients = new ArrayList<>();
     private ServerSocket serverSocket;
     private ExecutorService threadPool = Executors.newFixedThreadPool(10);
+    private static HashSet<String> inappropriateWords = new HashSet<>(); // Liste over upassende ord
+    private static final int MAX_INAPPROPRIATE_MESSAGES = 3; // Max antal beskeder med upassende ord
 
     // Privat konstruktor forhindrer direkte instansiering af klassen udefra
     private ChatServerDemo() {}
@@ -34,6 +37,9 @@ public class ChatServerDemo implements IObservable {
 
     public void startServer(int port) {
         try {
+            inappropriateWords.add("fuck");
+            inappropriateWords.add("bitch");
+            inappropriateWords.add("shit");
             this.serverSocket = new ServerSocket(port);
             System.out.println("Server started on port " + port);
 
@@ -103,6 +109,13 @@ public class ChatServerDemo implements IObservable {
         clients.remove(client);
     }
 
+    public synchronized void addInappropriateWord(String word) {
+        if (!inappropriateWords.contains(word)) {
+            inappropriateWords.add(word); // Tilføjer ordet, hvis det ikke allerede er i listen
+            broadcast("New inappropriate word added: " + word); // Informerer alle klienter
+        }
+    }
+
 
     public void shutdown() {
         try {
@@ -128,6 +141,8 @@ public class ChatServerDemo implements IObservable {
             e.printStackTrace();
         }
     }
+
+
     //--------------------------------------------------------------------------------------------------------------------------
 
     public static class ClientHandler implements Runnable, IObserver {
@@ -157,6 +172,29 @@ public class ChatServerDemo implements IObservable {
             try {
                 String msg;
                 while ((msg = in.readLine()) != null) { // Læser beskeder fra klienten
+                    // Tjek om beskeden indeholder et bandord
+                    boolean containsInappropriateWord = false;
+                    for (String word : inappropriateWords) {
+                        if (msg.contains(word)) {
+                            containsInappropriateWord = true;
+                            break; // Stopper efter første fund af et bandord
+                        }
+                    }
+
+                    // Hvis beskeden indeholder et bandord, send besked og spring over udførelsen af kommandoen
+                    if (containsInappropriateWord) {
+                        sendMessage("You cannot use inappropriate words!");
+                        continue; // Spring beskeden over
+                    }
+
+                    // Tjek om beskeden er et bandord, der skal tilføjes
+                    if (msg.startsWith("**")) {
+                        String word = msg.substring(2).trim(); // Fjerner "**" fra starten af ordet
+                        getServer().addInappropriateWord(word); // Tilføjer ordet til bandord listen
+                        sendMessage("The word '" + word + "' has been added to the inappropriate words list.");
+                        continue; // Spring over kommandoeksekvering
+                    }
+
                     // Hent kommandoen fra starten af beskeden
                     String commandKey = getCommandKey(msg);
                     Command command = CommandFactory.getCommand(commandKey);
@@ -168,6 +206,7 @@ public class ChatServerDemo implements IObservable {
                 e.printStackTrace();
             }
         }
+
 
         private String getCommandKey(String msg) {
             // Returnerer kommandoen ud fra den første del af beskeden
