@@ -106,7 +106,7 @@ public class Commands {
         @Override
         public void execute(ChatServerDemo.ClientHandler client, String message) {
             //Sender en liste over tilgængelige kommandoer.
-            client.sendMessage("Available commands: #JOIN, #MESSAGE, #PRIVATE, #GETLIST, #PRIVATESUBLIST, #HELP, #STOPSERVER #LEAVE");
+            client.sendMessage("Available commands: #JOIN, #MESSAGE, #PRIVATE, #GETLIST, #PRIVATESUBLIST, #HELP, #STOPSERVER #LEAVE, #COLORMESSAGE");
         }
     }
 

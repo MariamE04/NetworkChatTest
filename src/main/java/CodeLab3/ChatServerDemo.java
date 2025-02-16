@@ -13,17 +13,17 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class ChatServerDemo implements IObservable {
-    private static volatile IObservable server = null; // Volatil variabel
-    private List<ClientHandler> clients = new ArrayList<>();
-    private ServerSocket serverSocket;
-    private ExecutorService threadPool = Executors.newFixedThreadPool(10);
+    // Singleton-instansering: Sikrer, at der kun er én instans af serveren
+    private static volatile IObservable server = null; // Volatil variabel bruges for trådsikkerhed
+    private List<ClientHandler> clients = new ArrayList<>(); // Liste over klienter
+    private ServerSocket serverSocket; // Serverens socket til at lytte efter forbindelser
+    private ExecutorService threadPool = Executors.newFixedThreadPool(10); // Thread pool til håndtering af klienter
     private static HashSet<String> inappropriateWords = new HashSet<>(); // Liste over upassende ord
-    private static final int MAX_INAPPROPRIATE_MESSAGES = 3; // Max antal beskeder med upassende ord
 
     // Privat konstruktor forhindrer direkte instansiering af klassen udefra
     private ChatServerDemo() {}
 
-    // Singleton-mønster: Sikrer, at der kun er én instans af serveren
+    // Singleton-metode: Sikrer, at kun én instans oprettes
     public static synchronized ChatServerDemo getInstance() {
         if (server == null) {
             server = new ChatServerDemo();
@@ -32,11 +32,12 @@ public class ChatServerDemo implements IObservable {
     }
 
     public static void main(String[] args) {
-        ChatServerDemo.getInstance().startServer(8080); // Starter serveren på port 8080
+        ChatServerDemo.getInstance().startServer(9999); // Starter serveren på port 9999
     }
 
     public void startServer(int port) {
         try {
+            // Tilføjer standard upassende ord
             inappropriateWords.add("fuck");
             inappropriateWords.add("bitch");
             inappropriateWords.add("shit");
@@ -44,10 +45,10 @@ public class ChatServerDemo implements IObservable {
             System.out.println("Server started on port " + port);
 
             while (true) {
-                Socket clientSocket = serverSocket.accept();
+                Socket clientSocket = serverSocket.accept(); // Accepterer nye klientforbindelser
                 ClientHandler clientHandler = new ClientHandler(clientSocket, this, clients);
-                clients.add(clientHandler);
-                threadPool.execute(clientHandler); // Brug thread pool til at håndtere klienten
+                clients.add(clientHandler); // Tilføjer klienten til listen
+                threadPool.execute(clientHandler); // Starter klienthåndtering i en separat tråd
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -56,22 +57,24 @@ public class ChatServerDemo implements IObservable {
 
     @Override
     public void broadcast(String msg) {
-        for (ClientHandler ch : clients) { // Går igennem alle klienter og sender beskeden
+        // Sender besked til alle klienter
+        for (ClientHandler ch : clients) {
             ch.notify(msg);
         }
     }
 
     public synchronized ClientHandler getClientByName(String name) {
-        for (ClientHandler client : clients) { // Går igennem alle klienter
-            if (client.getName().equalsIgnoreCase(name)) { // Finder klienten med det ønskede navn
+        // Finder klient ud fra navn
+        for (ClientHandler client : clients) {
+            if (client.getName().equalsIgnoreCase(name)) {
                 return client;
             }
         }
-        return null; // Returnerer null, hvis ingen klient med det navn findes
+        return null;
     }
 
-    // Metode til at hente alle brugernavne
     public synchronized List<String> getUserList() {
+        // Returnerer en liste over alle brugernavne
         List<String> userList = new ArrayList<>();
         for (ClientHandler client : clients) {
             userList.add(client.getName());
@@ -80,24 +83,22 @@ public class ChatServerDemo implements IObservable {
     }
 
     public synchronized List<String> getPrivateSubList(String clientName) {
+        // Returnerer en liste over andre brugere end den anmodende klient
         List<String> privateSubList = new ArrayList<>();
         for (ClientHandler client : clients) {
             if (!client.getName().equals(clientName)) {
-                privateSubList.add(client.getName());  // Tilføjer alle klienter undtagen den anmodende klient
+                privateSubList.add(client.getName());
             }
         }
         return privateSubList;
     }
 
-    // Metode til at sende en privat besked
     public synchronized void sendPrivateMessage(String senderName, String receiverName, String message) {
-        // Find modtageren ved navn
+        // Finder modtager og sender en privat besked
         ClientHandler receiver = getClientByName(receiverName);
         if (receiver != null) {
-            // Sender besked til modtageren
             receiver.sendMessage("Private message from " + senderName + ": " + message);
         } else {
-            // Hvis modtageren ikke findes, send en fejlbesked til afsenderen
             ClientHandler sender = getClientByName(senderName);
             if (sender != null) {
                 sender.sendMessage("Error: User " + receiverName + " not found.");
@@ -106,21 +107,24 @@ public class ChatServerDemo implements IObservable {
     }
 
     public synchronized void removeClient(ClientHandler client) {
+        // Fjerner en klient fra listen
         clients.remove(client);
     }
 
     public synchronized void addInappropriateWord(String word) {
+        // Tilføjer et nyt bandord, hvis det ikke findes i forvejen
         if (!inappropriateWords.contains(word)) {
-            inappropriateWords.add(word); // Tilføjer ordet, hvis det ikke allerede er i listen
-            broadcast("New inappropriate word added: " + word); // Informerer alle klienter
+            inappropriateWords.add(word);
+            broadcast("New inappropriate word added: " + word);
         }
     }
 
 
     public void shutdown() {
-        try {
+        try { //Sender en besked til alle klienter om, at serveren lukker ned.
             broadcast("Server is shutting down. All clients will be disconnected.");
 
+            //Lukker alle klienters forbindelser.
             for (ClientHandler client : clients) {
                 try {
                     client.clientSocket.close();
@@ -131,6 +135,7 @@ public class ChatServerDemo implements IObservable {
                 }
             }
 
+            //Lukker serverens socket, hvis den ikke allerede er lukket.
             if (serverSocket != null && !serverSocket.isClosed()) {
                 serverSocket.close();
             }
@@ -145,14 +150,18 @@ public class ChatServerDemo implements IObservable {
 
     //--------------------------------------------------------------------------------------------------------------------------
 
-    public static class ClientHandler implements Runnable, IObserver {
-        private Socket clientSocket;
-        private PrintWriter out;
-        private BufferedReader in;
-        private IObservable server;
-        private List<ClientHandler> clients;
-        private String name = "GUEST"; // Klientens navn
+    //ClientHandler håndterer én klient og kører i sin egen tråd.
+    //Implementerer IObserver, så den kan modtage beskeder fra serveren.
 
+    public static class ClientHandler implements Runnable, IObserver {
+        private Socket clientSocket; //Forbindelsen til klienten.
+        private PrintWriter out;    //Bruges til at sende beskeder til klienten.
+        private BufferedReader in;  //Bruges til at læse beskeder fra klienten.
+        private IObservable server; //Refererer til serveren.
+        private List<ClientHandler> clients; //Liste over alle klienter.
+        private String name = "GUEST"; //Standardnavn for en ny klient.
+
+        //Konstruktor, der sætter forbindelsen op og opretter input/output-strømme.
         public ClientHandler(Socket socket, IObservable server, List<ClientHandler> clients) throws IOException {
             this.clientSocket = socket;
             this.server = server;
@@ -168,7 +177,7 @@ public class ChatServerDemo implements IObservable {
 
 
         @Override
-        public void run() {
+        public void run() { //Læser beskeder fra klienten løbende.
             try {
                 String msg;
                 while ((msg = in.readLine()) != null) { // Læser beskeder fra klienten
