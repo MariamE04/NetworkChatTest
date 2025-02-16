@@ -167,6 +167,10 @@ public class Commands {
         }
     }
 
+ //_____________________________________________________________________________________________________________
+    //Denne metode implementerer den funktionalitet, der er defineret i Command-interfacet. Den tager to parametre:
+    //client: En handler for den klient, der sender kommandoen.
+    //message: En streng, der repræsenterer den besked, klienten forsøger at sende med farve.
 
     public static class ColorMessageCommand implements Command {
         @Override
@@ -174,7 +178,12 @@ public class Commands {
             if (message.length() < 15) {
                 client.sendMessage("Invalid message format. Use: #COLORMESSAGE <color> <message>");
                 return;
+                //Hvis beskedens længde er mindre end 15 tegn (hvilket er for kort til at indeholde både farve og besked),
+                // sendes en fejlmeddelelse til klienten, og metoden stopper (return).
             }
+            //Beskeden opdeles i tre dele (farve, beskedtype, og selve beskeden) ved at bruge split(" ", 3).
+            // Dette opdeler strengen i maksimalt tre dele. Hvis resultatet ikke indeholder tre dele,
+            // sendes en vejledning om, hvordan kommandoen skal bruges, og metoden stopper.
             String[] parts = message.split(" ", 3);
             if (parts.length < 3) {
                 client.sendMessage("Usage: #COLORMESSAGE <color> <message>");
@@ -184,11 +193,11 @@ public class Commands {
             String color = parts[1];  // Farven
             String msgContent = parts[2];  // Selve beskeden
 
-            // Brug switch til at vælge farven
+            //switch til at vælge farven
             String colorCode;
-            switch (color.toUpperCase()) {
+            switch (color.toUpperCase()) { //gør farven uafhængig af store og små bogstaver.
                 case "RED":
-                    colorCode = "\u001B[31m";  // Rød farve
+                    colorCode = "\u001B[31m";  // Rød farve /ANSI escape-sekvens
                     break;
                 case "GREEN":
                     colorCode = "\u001B[32m";  // Grøn farve
@@ -215,7 +224,8 @@ public class Commands {
             ITextDecorator colorDecorator = new ColorDecorator(colorCode);
             String coloredMessage = colorDecorator.decorate(msgContent);
 
-            // Send den farvede besked til alle brugere
+            // Send den farvede besked til alle brugere ved hjælp af metoden broadcast i ChatServerDemo.
+            //Den sender beskeden sammen med klientens navn.
             client.getServer().broadcast(client.getName() + ": " + coloredMessage);
         }
     }
