@@ -3,18 +3,22 @@ package CodeLab3;
 import java.io.IOException;
 import java.util.ArrayList;
 
+//Klassen Commands indeholder forskellige kommandoer.
 public class Commands {
-    private static ArrayList<String> bannedWords = new ArrayList<>();
+    private static ArrayList<String> bannedWords = new ArrayList<>(); //En statisk liste, der gemmer bandeord.
+
+    //Indre klasse, som implementerer Command.
+    //Implementerer execute() metoden.
 
     // Kommando for at tilslutte chatten
     public static class JoinCommand implements Command {
         @Override
         public void execute(ChatServerDemo.ClientHandler client, String message) {
-            String[] parts = message.split(" ", 2);
-            if (parts.length < 2) {
+            String[] parts = message.split(" ", 2); //Deler beskeden op i to dele: kommando (#JOIN) og brugernavn.
+            if (parts.length < 2) { //Hvis beskeden ikke indeholder et navn, sender den en fejlmeddelelse.
                 client.sendMessage("Usage: #JOIN <name>");
             } else {
-                client.setName(parts[1]);
+                client.setName(parts[1]); //Sætter klientens navn og sender en besked til alle i chatten.
                 client.getServer().broadcast("A new person joined the chat. Welcome " + parts[1]);
             }
         }
@@ -24,16 +28,16 @@ public class Commands {
     public static class MessageCommand implements Command {
         @Override
         public void execute(ChatServerDemo.ClientHandler client, String message) {
-            if (message.length() < 9) {
+            if (message.length() < 9) { //Hvis beskeden er for kort, sendes en fejlmeddelelse.
                 client.sendMessage("Invalid message format. Use: #MESSAGE <text>");
                 return;
             }
-            String messageContent = message.substring(9).trim();
+            String messageContent = message.substring(9).trim(); //Beskeden hentes uden #MESSAGE kommandoen.
 
             // Tjek om beskeden indeholder bandeord og tilføj dem til listen
             checkForBannedWords(messageContent);
 
-            client.getServer().broadcast(client.getName() + ": " + messageContent);
+            client.getServer().broadcast(client.getName() + ": " + messageContent); //Sender beskeden til alle i chatten.
         }
     }
 
@@ -41,13 +45,15 @@ public class Commands {
     public static class PrivateCommand implements Command {
         @Override
         public void execute(ChatServerDemo.ClientHandler client, String message) {
-            String[] parts = message.split(" ", 3);
-            if (parts.length < 3) {
+            String[] parts = message.split(" ", 3); //Deler beskeden i tre dele: kommando (#PRIVATE), modtager og besked.
+            if (parts.length < 3) { //Hvis beskeden ikke er komplet, sendes en fejlmeddelelse.
                 client.sendMessage("Usage: #PRIVATE <receiver> <message>");
                 return;
             }
+            //Henter modtagerens navn og beskeden.
             String receiver = parts[1];
             String privateMessage = parts[2];  // Undgå navnekonflikt
+            //Sender beskeden til modtageren.
             client.getServer().sendPrivateMessage(client.getName(), receiver, privateMessage);
         }
     }
@@ -56,7 +62,7 @@ public class Commands {
     public static class GetListCommand implements Command {
         @Override
         public void execute(ChatServerDemo.ClientHandler client, String message) {
-            client.sendMessage("Online users: " + client.getServer().getUserList());
+            client.sendMessage("Online users: " + client.getServer().getUserList()); //Sender en liste over online brugere til klienten.
         }
     }
 
@@ -64,7 +70,7 @@ public class Commands {
     public static class PrivateSubListCommand implements Command {
         @Override
         public void execute(ChatServerDemo.ClientHandler sender, String message) {
-            String[] parts = message.split(" ", 2);
+            String[] parts = message.split(" ", 2); //deler beskeden i 2 del
             if (parts.length < 2) {
                 sender.sendMessage("Usage: #PRIVATESUBLIST \"nickname1,nickname2\" <message>");
                 return;
@@ -72,23 +78,24 @@ public class Commands {
 
             // Udtræk navne og besked
             String[] data = parts[1].split("\" ", 2);
-            if (data.length < 2) {
+            if (data.length < 2) { //Hvis inputtet er forkert, sendes en fejlmeddelelse.
                 sender.sendMessage("Error: Invalid format. Use #PRIVATESUBLIST \"nickname1,nickname2\" <message>");
                 return;
             }
 
-            String[] recipients = data[0].replace("\"", "").split(",");
+            //Deler input i to: kommando (#PRIVATESUBLIST) og resten af beskeden.
+            String[] recipients = data[0].replace("\"", "").split(",");//Finder listen af modtagere i citationstegn. Fjerner citationstegn og deler brugernavne ved ,.
             String msgContent = data[1];
 
             // Send beskeden til alle i listen
             ChatServerDemo server = sender.getServer();
-            for (String recipient : recipients) {
-                ChatServerDemo.ClientHandler client = server.getClientByName(recipient.trim());
+            for (String recipient : recipients) { //looper igen r
+                ChatServerDemo.ClientHandler client = server.getClientByName(recipient.trim()); //Finder den specifikke klient baseret på navn.
                 if (client != null) {
                     client.sendMessage("Private group message from " + sender.getName() + ": " + msgContent);
                 } else {
                     sender.sendMessage("User " + recipient + " not found.");
-                }
+                } //Sender beskeden til hver modtager eller giver en fejl, hvis en bruger ikke findes.
             }
         }
     }
@@ -98,6 +105,7 @@ public class Commands {
     public static class HelpCommand implements Command {
         @Override
         public void execute(ChatServerDemo.ClientHandler client, String message) {
+            //Sender en liste over tilgængelige kommandoer.
             client.sendMessage("Available commands: #JOIN, #MESSAGE, #PRIVATE, #GETLIST, #PRIVATESUBLIST, #HELP, #STOPSERVER #LEAVE");
         }
     }
@@ -106,6 +114,7 @@ public class Commands {
     public static class StopServerCommand implements Command {
         @Override
         public void execute(ChatServerDemo.ClientHandler client, String message) {
+            //Informerer klienterne og lukker serveren.
             client.sendMessage("Server shutting down...");
             client.getServer().shutdown();
         }
@@ -115,8 +124,8 @@ public class Commands {
     public static class LeaveCommand implements Command {
         @Override
         public void execute(ChatServerDemo.ClientHandler client, String message) {
-            client.getServer().broadcast(client.getName() + " has left the chat.");
-            client.sendMessage("Goodbye, " + client.getName() + ". You have left the chat.");
+            client.getServer().broadcast(client.getName() + " has left the chat."); //Sender en besked til alle i chatten om, at brugeren har forladt chatten.
+            client.sendMessage("Goodbye, " + client.getName() + ". You have left the chat."); //Sender en farvelbesked til klienten.
 
             // Fjern klienten fra serverens klientliste og luk forbindelsen
             client.getServer().removeClient(client);
@@ -124,7 +133,7 @@ public class Commands {
                 client.getClientSocket().close();
                 client.getOut().close();
                 client.getIn().close();
-            } catch (IOException e) {
+            } catch (IOException e) { //Lukker klientens forbindelse og håndterer eventuelle fejl.
                 e.printStackTrace();
             }
         }
@@ -135,7 +144,7 @@ public class Commands {
     public static class UnknownCommand implements Command {
         @Override
         public void execute(ChatServerDemo.ClientHandler client, String message) {
-            client.sendMessage("Unknown command. Type #HELP for available commands.");
+            client.sendMessage("Unknown command. Type #HELP for available commands."); //sender besked til klient
         }
     }
 
